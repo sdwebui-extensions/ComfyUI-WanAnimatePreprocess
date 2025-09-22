@@ -60,10 +60,10 @@ class PoseAndFaceDetection:
                 "images": ("IMAGE",),
                 "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 1, "tooltip": "Width of the generation"}),
                 "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 1, "tooltip": "Height of the generation"}),
-                "padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "tooltip": "Padding added to width and height after resizing"}),
+                "retarget_padding": ("INT", {"default": 16, "min": 0, "max": 512, "step": 1, "tooltip": "When > 0, the retargeted pose image is padded and resized to the target size"}),
             },
             "optional": {
-                "reference_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
+                "retarget_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
             },
         }
 
@@ -72,7 +72,7 @@ class PoseAndFaceDetection:
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
 
-    def process(self, model, images, width, height, reference_image=None, padding=64):
+    def process(self, model, images, width, height, retarget_image=None, retarget_padding=64):
         detector = model["yolo"]
         pose_model = model["vitpose"]
         B, H, W, C = images.shape
@@ -87,8 +87,8 @@ class PoseAndFaceDetection:
 
         detector.reinit()
         pose_model.reinit()
-        if reference_image is not None:
-            refer_img = resize_by_area(reference_image[0].numpy() * 255, width * height, divisor=16) / 255.0
+        if retarget_image is not None:
+            refer_img = resize_by_area(retarget_image[0].numpy() * 255, width * height, divisor=16) / 255.0
             ref_bbox = (detector(
                 cv2.resize(refer_img.astype(np.float32), (640, 640)).transpose(2, 0, 1)[None],
                 shape
@@ -150,7 +150,7 @@ class PoseAndFaceDetection:
         face_images_np = np.stack(face_images, 0)
         face_images_tensor = torch.from_numpy(face_images_np)
 
-        if reference_image is not None and refer_pose_meta is not None:
+        if retarget_image is not None and refer_pose_meta is not None:
             retarget_pose_metas = get_retarget_pose(pose_metas[0], refer_pose_meta, pose_metas, None, None)
         else:
             retarget_pose_metas = [AAPoseMeta.from_humanapi_meta(meta) for meta in pose_metas]
@@ -162,10 +162,10 @@ class PoseAndFaceDetection:
             pose_image = draw_aapose_by_meta_new(canvas, meta)
             if crop_target_image is None:
                 crop_target_image = pose_image
-            if padding == 0:
+            if retarget_padding == 0:
                 pose_image = padding_resize(pose_image, height, width)
-            else:
-                pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=padding)
+            elif retarget_image is not None:
+                pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
             cond_images.append(pose_image)
         cond_images_np = np.stack(cond_images, 0)
         cond_images_tensor = torch.from_numpy(cond_images_np)
