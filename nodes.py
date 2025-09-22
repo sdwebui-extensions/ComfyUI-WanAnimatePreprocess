@@ -173,7 +173,7 @@ class PoseAndFaceDetection:
         else:
             bbox_ints = (0, 0, 0, 0)
 
-        key_frame_num = 4
+        key_frame_num = 4 if B >= 4 else 1
         key_frame_step = len(pose_metas) // key_frame_num
         key_frame_index_list = list(range(0, len(pose_metas), key_frame_step))
 
