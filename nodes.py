@@ -60,7 +60,7 @@ class PoseAndFaceDetection:
                 "images": ("IMAGE",),
                 "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 1, "tooltip": "Width of the generation"}),
                 "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 1, "tooltip": "Height of the generation"}),
-                "padding": ("INT", {"default": 64, "min": 0, "max": 512, "step": 1, "tooltip": "Padding added to width and height after resizing"}),
+                "padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "tooltip": "Padding added to width and height after resizing"}),
             },
             "optional": {
                 "reference_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
@@ -162,7 +162,10 @@ class PoseAndFaceDetection:
             pose_image = draw_aapose_by_meta_new(canvas, meta)
             if crop_target_image is None:
                 crop_target_image = pose_image
-            pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=padding)
+            if padding == 0:
+                pose_image = padding_resize(pose_image, height, width)
+            else:
+                pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=padding)
             cond_images.append(pose_image)
         cond_images_np = np.stack(cond_images, 0)
         cond_images_tensor = torch.from_numpy(cond_images_np)
