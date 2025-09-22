@@ -123,7 +123,7 @@ class PoseAndFaceDetection:
                 bbox = np.array([0, 0, img.shape[1], img.shape[0]])
 
             bbox_xywh = bbox
-            center, scale = bbox_from_detector(bbox_xywh, (224, 224), rescale=rescale)
+            center, scale = bbox_from_detector(bbox_xywh, (256, 192), rescale=rescale)
             img = crop(img, center, scale, (input_resolution[0], input_resolution[1]))[0]
 
             img_norm = (img - IMG_NORM_MEAN) / IMG_NORM_STD
