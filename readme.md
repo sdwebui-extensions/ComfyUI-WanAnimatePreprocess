@@ -16,10 +16,14 @@ https://huggingface.co/Wan-AI/Wan2.2-Animate-14B/blob/main/process_checkpoint/de
 
 ViTPose ONNX:
 
-Original code uses the H variant, which is over the 2GB ONNX model size limit so it's split to multiple files.
-L model seems to work fine too:
+Original code uses the Huge variant, which is over the 2GB ONNX model size limit so it's split to multiple files.
+Large model seems to work fine too:
 
 https://huggingface.co/JunkyByte/easy_ViTPose/tree/main/onnx/wholebody
+
+Combined data to single .bin file for the Huge model, both files need to be in same directory, and the onnx file selected in the model loader:
+
+https://huggingface.co/Kijai/vitpose_comfy/tree/main/onnx
 
 
 ![wip_example](image.png)
