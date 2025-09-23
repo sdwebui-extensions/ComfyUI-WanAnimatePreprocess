@@ -96,14 +96,14 @@ class PoseAndFaceDetection:
             if ref_bbox is None or ref_bbox[-1] <= 0 or (ref_bbox[2] - ref_bbox[0]) < 10 or (ref_bbox[3] - ref_bbox[1]) < 10:
                 ref_bbox = np.array([0, 0, refer_img.shape[1], refer_img.shape[0]])
 
-            center, scale = bbox_from_detector(ref_bbox, (224, 224), rescale=rescale)
+            center, scale = bbox_from_detector(ref_bbox, input_resolution, rescale=rescale)
             refer_img = crop(refer_img, center, scale, (input_resolution[0], input_resolution[1]))[0]
 
             img_norm = (refer_img - IMG_NORM_MEAN) / IMG_NORM_STD
             img_norm = img_norm.transpose(2, 0, 1).astype(np.float32)
 
             ref_keypoints = pose_model(img_norm[None], np.array(center)[None], np.array(scale)[None])
-            refer_pose_meta = load_pose_metas_from_kp2ds_seq(ref_keypoints, width=W, height=H)[0]
+            refer_pose_meta = load_pose_metas_from_kp2ds_seq(ref_keypoints, width=retarget_image.shape[2], height=retarget_image.shape[1])[0]
 
         comfy_pbar = ProgressBar(B*2)
         bboxes = []
@@ -122,7 +122,7 @@ class PoseAndFaceDetection:
                 bbox = np.array([0, 0, img.shape[1], img.shape[0]])
 
             bbox_xywh = bbox
-            center, scale = bbox_from_detector(bbox_xywh, (256, 192), rescale=rescale)
+            center, scale = bbox_from_detector(bbox_xywh, input_resolution, rescale=rescale)
             img = crop(img, center, scale, (input_resolution[0], input_resolution[1]))[0]
 
             img_norm = (img - IMG_NORM_MEAN) / IMG_NORM_STD
@@ -185,6 +185,8 @@ class PoseAndFaceDetection:
         pose_data = {
             "retarget_image": refer_img if retarget_image is not None else None,
             "pose_metas": retarget_pose_metas,
+            "refer_pose_meta": refer_pose_meta if retarget_image is not None else None,
+            "pose_metas_original": pose_metas,
         }
 
         return (pose_data, face_images_tensor, json.dumps(points_dict_list), [bbox_ints],)
@@ -236,14 +238,79 @@ class DrawViTPose:
         pose_images_tensor = torch.from_numpy(pose_images_np).float() / 255.0
 
         return (pose_images_tensor, )
+    
+class PoseRetargetPromptHelper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "pose_data": ("POSEDATA",),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING", )
+    RETURN_NAMES = ("prompt", "retarget_prompt", )
+    FUNCTION = "process"
+    CATEGORY = "WanAnimatePreprocess"
+    DESCRIPTION = "Generates text prompts for pose retargeting based on visibility of arms and legs in the template pose. Originally used for Flux Kontext"
+
+    def process(self, pose_data):
+        refer_pose_meta = pose_data.get("refer_pose_meta", None)
+        if refer_pose_meta is None:
+            return ("Change the person to face forward.", "Change the person to face forward.", )
+        tpl_pose_metas = pose_data["pose_metas_original"]
+        arm_visible = False
+        leg_visible = False
+
+        for tpl_pose_meta in tpl_pose_metas:
+            tpl_keypoints = tpl_pose_meta['keypoints_body']
+            tpl_keypoints = np.array(tpl_keypoints)
+            if np.any(tpl_keypoints[3]) != 0 or np.any(tpl_keypoints[4]) != 0 or np.any(tpl_keypoints[6]) != 0 or np.any(tpl_keypoints[7]) != 0:
+                if (tpl_keypoints[3][0] <= 1 and tpl_keypoints[3][1] <= 1 and tpl_keypoints[3][2] >= 0.75) or (tpl_keypoints[4][0] <= 1 and tpl_keypoints[4][1] <= 1 and tpl_keypoints[4][2] >= 0.75) or \
+                    (tpl_keypoints[6][0] <= 1 and tpl_keypoints[6][1] <= 1 and tpl_keypoints[6][2] >= 0.75) or (tpl_keypoints[7][0] <= 1 and tpl_keypoints[7][1] <= 1 and tpl_keypoints[7][2] >= 0.75):
+                    arm_visible = True
+            if np.any(tpl_keypoints[9]) != 0 or np.any(tpl_keypoints[12]) != 0 or np.any(tpl_keypoints[10]) != 0 or np.any(tpl_keypoints[13]) != 0:
+                if (tpl_keypoints[9][0] <= 1 and tpl_keypoints[9][1] <= 1 and tpl_keypoints[9][2] >= 0.75) or (tpl_keypoints[12][0] <= 1 and tpl_keypoints[12][1] <= 1 and tpl_keypoints[12][2] >= 0.75) or \
+                    (tpl_keypoints[10][0] <= 1 and tpl_keypoints[10][1] <= 1 and tpl_keypoints[10][2] >= 0.75) or (tpl_keypoints[13][0] <= 1 and tpl_keypoints[13][1] <= 1 and tpl_keypoints[13][2] >= 0.75):
+                    leg_visible = True
+            if arm_visible and leg_visible:
+                break
+
+        if leg_visible:
+            if tpl_pose_meta['width'] > tpl_pose_meta['height']:
+                tpl_prompt = "Change the person to a standard T-pose (facing forward with arms extended). The person is standing. Feet and Hands are visible in the image."
+            else:
+                tpl_prompt = "Change the person to a standard pose with the face oriented forward and arms extending straight down by the sides. The person is standing. Feet and Hands are visible in the image."
+
+            if refer_pose_meta['width'] > refer_pose_meta['height']:
+                refer_prompt = "Change the person to a standard T-pose (facing forward with arms extended). The person is standing. Feet and Hands are visible in the image."
+            else:
+                refer_prompt = "Change the person to a standard pose with the face oriented forward and arms extending straight down by the sides. The person is standing. Feet and Hands are visible in the image."
+        elif arm_visible:
+            if tpl_pose_meta['width'] > tpl_pose_meta['height']:
+                tpl_prompt = "Change the person to a standard T-pose (facing forward with arms extended). Hands are visible in the image."
+            else:
+                tpl_prompt = "Change the person to a standard pose with the face oriented forward and arms extending straight down by the sides. Hands are visible in the image."
+
+            if refer_pose_meta['width'] > refer_pose_meta['height']:
+                refer_prompt = "Change the person to a standard T-pose (facing forward with arms extended). Hands are visible in the image."
+            else:
+                refer_prompt = "Change the person to a standard pose with the face oriented forward and arms extending straight down by the sides. Hands are visible in the image."
+        else:
+            tpl_prompt = "Change the person to face forward."
+            refer_prompt = "Change the person to face forward."
+
+        return (tpl_prompt, refer_prompt, )
 
 NODE_CLASS_MAPPINGS = {
     "OnnxDetectionModelLoader": OnnxDetectionModelLoader,
     "PoseAndFaceDetection": PoseAndFaceDetection,
     "DrawViTPose": DrawViTPose,
+    "PoseRetargetPromptHelper": PoseRetargetPromptHelper,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "OnnxDetectionModelLoader": "ONNX Detection Model Loader",
     "PoseAndFaceDetection": "Pose and Face Detection",
     "DrawViTPose": "Draw ViT Pose",
+    "PoseRetargetPromptHelper": "Pose Retarget Prompt Helper",
 }
