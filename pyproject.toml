@@ -11,5 +11,5 @@ Repository = "https://github.com/kijai/ComfyUI-WanAnimatePreprocess"
 
 [tool.comfy]
 PublisherId = "kijai"
-DisplayName = "ComfyUI-VitPose"
+DisplayName = "ComfyUI-WanAnimatePreprocess"
 Icon = ""
