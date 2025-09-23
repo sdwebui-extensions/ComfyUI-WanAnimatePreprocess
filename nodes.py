@@ -35,6 +35,7 @@ class OnnxDetectionModelLoader:
     RETURN_NAMES = ("model", )
     FUNCTION = "loadmodel"
     CATEGORY = "WanAnimatePreprocess"
+    DESCRIPTION = "Loads ONNX models for pose and face detection. ViTPose for pose estimation and YOLO for object detection."
 
     def loadmodel(self, vitpose_model, yolo_model, onnx_device):
 
@@ -70,6 +71,7 @@ class PoseAndFaceDetection:
     RETURN_NAMES = ("pose_data", "face_images", "key_frame_body_points", "bboxes", )
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
+    DESCRIPTION = "Detects human poses and face images from input images. Optionally retargets poses based on a reference image."
 
     def process(self, model, images, width, height, retarget_image=None):
         detector = model["yolo"]
@@ -215,6 +217,7 @@ class DrawViTPose:
     RETURN_NAMES = ("pose_images", )
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
+    DESCRIPTION = "Draws pose images from pose data."
 
     def process(self, pose_data, width, height, body_stick_width, hand_stick_width, draw_head, retarget_padding=64):
 
