@@ -160,7 +160,7 @@ def padding_resize(img_ori, height=512, width=512, padding_color=(0, 0, 0), inte
     ori_width = img_ori.shape[1]
     channel = img_ori.shape[2]
 
-    img_pad = np.zeros((height, width, channel))
+    img_pad = np.zeros((height, width, channel), dtype=img_ori.dtype)
     if channel == 1:
         img_pad[:, :, 0] = padding_color[0]
     else:
@@ -182,8 +182,6 @@ def padding_resize(img_ori, height=512, width=512, padding_color=(0, 0, 0), inte
         if len(img.shape) == 2:
             img = img[:, :, np.newaxis]  
         img_pad[padding: padding + new_height, :, :] = img
-
-    #img_pad = np.uint8(img_pad)
 
     return img_pad
 

@@ -228,11 +228,11 @@ class DrawViTPose:
         progress = 0
         crop_target_image = None
         pose_images = []
-        
+
         for idx, meta in enumerate(tqdm(pose_metas, desc="Drawing pose images")):
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
-            
+
             if crop_target_image is None:
                 crop_target_image = pose_image
 
@@ -240,17 +240,17 @@ class DrawViTPose:
                 pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
             else:
                 pose_image = padding_resize(pose_image, height, width)
-                
+
             pose_images.append(pose_image)
             progress += 1
             if progress % 10 == 0:
                 comfy_pbar.update_absolute(progress)
-            
+
         pose_images_np = np.stack(pose_images, 0)
         pose_images_tensor = torch.from_numpy(pose_images_np).float() / 255.0
 
         return (pose_images_tensor, )
-    
+
 class PoseRetargetPromptHelper:
     @classmethod
     def INPUT_TYPES(s):
