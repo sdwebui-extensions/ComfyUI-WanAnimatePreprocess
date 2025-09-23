@@ -188,6 +188,7 @@ def padding_resize(img_ori, height=512, width=512, padding_color=(0, 0, 0), inte
     return img_pad
 
 def resize_to_bounds(img_ori, height=512, width=512, padding_color=(0, 0, 0), interpolation=cv2.INTER_LINEAR, extra_padding=64, crop_target_image=None):
+    print(img_ori.dtype, img_ori.shape, img_ori.min(), img_ori.max())
     # Find non-black pixel bounds
     if crop_target_image is not None:
         ref = crop_target_image

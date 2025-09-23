@@ -182,8 +182,12 @@ class PoseAndFaceDetection:
             for point in points:
                 points_dict_list.append({"x": int(point[0]), "y": int(point[1])})
 
+        pose_data = {
+            "retarget_image": refer_img if retarget_image is not None else None,
+            "pose_metas": retarget_pose_metas,
+        }
 
-        return (retarget_pose_metas, face_images_tensor, json.dumps(points_dict_list), [bbox_ints],)
+        return (pose_data, face_images_tensor, json.dumps(points_dict_list), [bbox_ints],)
 
 class DrawViTPose:
     @classmethod
@@ -205,26 +209,26 @@ class DrawViTPose:
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
 
-    def process(self, pose_data, width, height, body_stick_width, hand_stick_width, draw_head, retarget_image=None, retarget_padding=64):
+    def process(self, pose_data, width, height, body_stick_width, hand_stick_width, draw_head, retarget_padding=64):
+
+        crop_target_image = pose_data.get("retarget_image", None)
+        pose_metas = pose_data["pose_metas"]
 
         draw_hand = True
         if hand_stick_width == 0:
             draw_hand = False
             
-        crop_target_image = None
         pose_images = []
-        for idx, meta in enumerate(pose_data):
+        for idx, meta in enumerate(pose_metas):
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
-            if crop_target_image is None:
-                crop_target_image = pose_image
-            if retarget_padding == 0:
+            if retarget_padding == 0 or crop_target_image is None:
                 pose_image = padding_resize(pose_image, height, width)
-            elif retarget_image is not None:
+            elif crop_target_image is not None:
                 pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
             pose_images.append(pose_image)
         pose_images_np = np.stack(pose_images, 0)
-        pose_images_tensor = torch.from_numpy(pose_images_np)
+        pose_images_tensor = torch.from_numpy(pose_images_np).float() / 255.0
 
         return (pose_images_tensor, )
 
