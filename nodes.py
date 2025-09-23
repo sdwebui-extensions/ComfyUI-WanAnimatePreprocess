@@ -75,7 +75,7 @@ class PoseAndFaceDetection:
         detector = model["yolo"]
         pose_model = model["vitpose"]
         B, H, W, C = images.shape
-        
+
         shape = np.array([H, W])[None]
         images_np = images.numpy()
 
@@ -113,7 +113,7 @@ class PoseAndFaceDetection:
                 shape
                 )[0][0]["bbox"])
             comfy_pbar.update(1)
-            
+
         detector.cleanup()
 
         kp2ds = []
@@ -165,7 +165,7 @@ class PoseAndFaceDetection:
         key_frame_index_list = list(range(0, len(pose_metas), key_frame_step))
 
         key_points_index = [0, 1, 2, 5, 8, 11, 10, 13]
-        
+
         for key_frame_index in key_frame_index_list:
             keypoints_body_list = []
             body_key_points = pose_metas[key_frame_index]['keypoints_body']
@@ -217,10 +217,11 @@ class DrawViTPose:
         draw_hand = True
         if hand_stick_width == 0:
             draw_hand = False
-            
+
+        comfy_pbar = ProgressBar(len(pose_metas))
         crop_target_image = None
         pose_images = []
-        for idx, meta in enumerate(pose_metas):
+        for idx, meta in enumerate(tqdm(pose_metas, desc="Drawing pose images")):
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
             if crop_target_image is None:
@@ -230,6 +231,7 @@ class DrawViTPose:
             elif retarget_image is not None:
                 pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
             pose_images.append(pose_image)
+            comfy_pbar.update(1)
         pose_images_np = np.stack(pose_images, 0)
         pose_images_tensor = torch.from_numpy(pose_images_np).float() / 255.0
 
