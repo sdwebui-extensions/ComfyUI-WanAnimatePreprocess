@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import onnxruntime
 
-from ..pose_utils.pose2d_utils import (box_convert_simple, bbox_from_detector, crop, keypoints_from_heatmaps)
+from ..pose_utils.pose2d_utils import box_convert_simple, keypoints_from_heatmaps
 
 class SimpleOnnxInference(object):
     def __init__(self, checkpoint, device='CUDAExecutionProvider', **kwargs):
@@ -19,11 +19,11 @@ class SimpleOnnxInference(object):
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
         self.input_resolution = self.session.get_inputs()[0].shape[2:]
-        self.input_resolution = np.array(self.input_resolution)        
+        self.input_resolution = np.array(self.input_resolution)
 
     def __call__(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
-    
+
     def get_output_names(self):
         output_names = []
         for node in self.session.get_outputs():
@@ -52,13 +52,13 @@ class SimpleOnnxInference(object):
 class Yolo(SimpleOnnxInference):
     def __init__(self, checkpoint, device='cuda', threshold_conf=0.05, threshold_multi_persons=0.1, input_resolution=(640, 640), threshold_iou=0.5, threshold_bbox_shape_ratio=0.4, cat_id=[1], select_type='max', strict=True, sorted_func=None, **kwargs):
         super(Yolo, self).__init__(checkpoint, device=device, **kwargs)
-        
+
         model_inputs = self.session.get_inputs()
         input_shape = model_inputs[0].shape
 
         self.input_width = 640
         self.input_height = 640
-        
+
         self.threshold_multi_persons = threshold_multi_persons
         self.threshold_conf = threshold_conf
         self.threshold_iou = threshold_iou
@@ -68,9 +68,9 @@ class Yolo(SimpleOnnxInference):
         self.select_type = select_type
         self.strict = strict
         self.sorted_func = sorted_func
-        
 
-    
+
+
     def postprocess(self, output, shape_raw, cat_id=[1]):
         """
         Performs post-processing on the model's output to extract bounding boxes, scores, and class IDs.
@@ -89,7 +89,7 @@ class Yolo(SimpleOnnxInference):
             outputs = outputs[None]
         if output.shape[-1] != 6 and output.shape[1] == 84:
             outputs = np.transpose(outputs)
-        
+
         # Get the number of rows in the outputs array
         rows = outputs.shape[0]
 
@@ -105,7 +105,7 @@ class Yolo(SimpleOnnxInference):
         if outputs.shape[-1] == 6:
             max_scores = outputs[:, 4]
             classid = outputs[:, -1]
-            
+
             threshold_conf_masks = max_scores >= self.threshold_conf
             classid_masks = classid[threshold_conf_masks] != 3.14159
 
@@ -127,18 +127,18 @@ class Yolo(SimpleOnnxInference):
             classid = np.argmax(classes_scores[threshold_conf_masks], -1)
 
             classid_masks = classid!=3.14159
-            
+
             classes_scores = classes_scores[threshold_conf_masks][classid_masks]
             max_scores = max_scores[threshold_conf_masks][classid_masks]
             classid = classid[classid_masks]
-    
+
             xywh = outputs[:, :4][threshold_conf_masks][classid_masks]
 
             x = xywh[:, 0:1]
             y = xywh[:, 1:2]
             w = xywh[:, 2:3]
             h = xywh[:, 3:4]
-    
+
             left = ((x - w / 2) * x_factor)
             top = ((y - h / 2) * y_factor)
             width = (w * x_factor)
@@ -152,7 +152,7 @@ class Yolo(SimpleOnnxInference):
         # Apply non-maximum suppression to filter out overlapping bounding boxes
         indices = cv2.dnn.NMSBoxes(boxes, scores, self.threshold_conf, self.threshold_iou)
         # Iterate over the selected indices after non-maximum suppression
-        
+
         results = []
         for i in indices:
             # Get the box, score, and class ID corresponding to the index
@@ -165,7 +165,7 @@ class Yolo(SimpleOnnxInference):
         # Return the modified input image
         return np.array(results)
 
-    
+
     def process_results(self, results, shape_raw, cat_id=[1], single_person=True):
         if isinstance(results, tuple):
             det_results = results[0]
@@ -178,7 +178,7 @@ class Yolo(SimpleOnnxInference):
             max_idx = -1
             max_bbox_size = shape_raw[0] * shape_raw[1] * -10
             max_bbox_shape = -1
-            
+
             bboxes = []
             idx_list = []
             for i in range(results.shape[0]):
@@ -188,7 +188,7 @@ class Yolo(SimpleOnnxInference):
                     bbox_shape = max((bbox[2] - bbox[0]), ((bbox[3] - bbox[1])))
                     if bbox_shape > max_bbox_shape:
                         max_bbox_shape = bbox_shape
-            
+
             results = results[idx_list]
 
             for i in range(results.shape[0]):
@@ -213,7 +213,7 @@ class Yolo(SimpleOnnxInference):
                     max_bbox_size = (bbox[2] - bbox[0]) * ((bbox[3] - bbox[1]))
                 elif self.select_type == 'center':
                     max_bbox_size = (abs((bbox[2] + bbox[0]) / 2 - shape_raw[1]/2)) * -1
-                
+
             if max_idx != -1:
                 person_count = 1
 
@@ -236,11 +236,11 @@ class Yolo(SimpleOnnxInference):
                             person = {}
                             person['bbox'] = results[i, :5]
                             person['track_id'] = int(person_count - 1)
-                            person_results.append(person)                   
+                            person_results.append(person)
             return person_results
         else:
             return None
-        
+
 
     def postprocess_threading(self, outputs, shape_raw, person_results, i, single_person=True, **kwargs):
         result = self.postprocess(outputs[i], shape_raw[i], cat_id=self.cat_id)
@@ -264,7 +264,7 @@ class Yolo(SimpleOnnxInference):
         person_results = [[{'bbox': np.array([0., 0., 1.*shape_raw[i][1], 1.*shape_raw[i][0], -1]), 'track_id': -1}] for i in range(len(outputs))]
 
         for i in range(len(outputs)):
-            self.postprocess_threading(outputs, shape_raw, person_results, i, **kwargs)         
+            self.postprocess_threading(outputs, shape_raw, person_results, i, **kwargs)
         return person_results
 
 
@@ -277,29 +277,6 @@ class ViTPose(SimpleOnnxInference):
         points, prob = keypoints_from_heatmaps(heatmaps=heatmaps,
                                             center=center,
                                             scale=scale*200,
-                                            unbiased=True, 
+                                            unbiased=True,
                                             use_udp=False)
         return np.concatenate([points, prob], axis=2)
-
-
-    @staticmethod
-    def preprocess(img, bbox=None, input_resolution=(256, 192), rescale=1.25, mask=None, **kwargs):
-        if bbox is None or bbox[-1] <= 0 or (bbox[2] - bbox[0]) < 10 or (bbox[3] - bbox[1]) < 10:
-            bbox = np.array([0, 0, img.shape[1], img.shape[0]])
-        
-        bbox_xywh = bbox
-        if mask is not None:
-            img = np.where(mask>128, img, mask)
-
-        if isinstance(input_resolution, int):
-            center, scale = bbox_from_detector(bbox_xywh, (input_resolution, input_resolution), rescale=rescale)
-            img, new_shape, old_xy, new_xy = crop(img, center, scale, (input_resolution, input_resolution))
-        else:
-            center, scale = bbox_from_detector(bbox_xywh, input_resolution, rescale=rescale)
-            img, new_shape, old_xy, new_xy = crop(img, center, scale, (input_resolution[0], input_resolution[1]))
-
-        IMG_NORM_MEAN = np.array([0.485, 0.456, 0.406])
-        IMG_NORM_STD = np.array([0.229, 0.224, 0.225])
-        img_norm = (img / 255. - IMG_NORM_MEAN) / IMG_NORM_STD
-        img_norm = img_norm.transpose(2, 0, 1).astype(np.float32)
-        return img_norm, np.array(center), np.array(scale)

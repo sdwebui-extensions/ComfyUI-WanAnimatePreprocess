@@ -6,13 +6,6 @@ import random
 import numpy as np
 
 def get_mask_boxes(mask):
-    """
-
-    Args:
-        mask: [h, w]
-    Returns:
-
-    """
     y_coords, x_coords = np.nonzero(mask)
     x_min = x_coords.min()
     x_max = x_coords.max()
@@ -32,7 +25,6 @@ def get_aug_mask(body_mask, w_len=10, h_len=20):
     for each_w in range(body_bbox[0], body_bbox[2], w_slice):
         w_start = min(each_w, body_bbox[2])
         w_end = min((each_w + w_slice), body_bbox[2])
-        # print(w_start, w_end)
         for each_h in range(body_bbox[1], body_bbox[3], h_slice):
             h_start = min(each_h, body_bbox[3])
             h_end = min((each_h + h_slice), body_bbox[3])
@@ -40,7 +32,7 @@ def get_aug_mask(body_mask, w_len=10, h_len=20):
                 body_mask[h_start:h_end, w_start:w_end] = 1
 
     return body_mask
-    
+
 def get_mask_body_img(img_copy, hand_mask, k=7, iterations=1):
     kernel = np.ones((k, k), np.uint8)
     dilation = cv2.dilate(hand_mask, kernel, iterations=iterations)
@@ -92,9 +84,9 @@ def calculate_new_size(orig_w, orig_h, target_area, divisor=64):
 
         if w <= 0 or h <= 0:
             return False
-        return (w * h <= target_area and  
-                w % divisor == 0 and  
-                h % divisor == 0)  
+        return (w * h <= target_area and
+                w % divisor == 0 and
+                h % divisor == 0)
 
     def get_ratio_diff(w, h):
 
@@ -173,14 +165,14 @@ def padding_resize(img_ori, height=512, width=512, padding_color=(0, 0, 0), inte
         img = cv2.resize(img_ori, (new_width, height), interpolation=interpolation)
         padding = int((width - new_width) / 2)
         if len(img.shape) == 2:
-            img = img[:, :, np.newaxis]  
+            img = img[:, :, np.newaxis]
         img_pad[:, padding: padding + new_width, :] = img
     else:
         new_height = int(width / ori_width * ori_height)
         img = cv2.resize(img_ori, (width, new_height), interpolation=interpolation)
         padding = int((height - new_height) / 2)
         if len(img.shape) == 2:
-            img = img[:, :, np.newaxis]  
+            img = img[:, :, np.newaxis]
         img_pad[padding: padding + new_height, :, :] = img
 
     return img_pad

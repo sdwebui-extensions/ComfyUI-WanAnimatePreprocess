@@ -3,8 +3,6 @@ import warnings
 import cv2
 import numpy as np
 from typing import List
-from PIL import Image
-
 
 def box_convert_simple(box, convert_type='xyxy2xywh'):
     if convert_type == 'xyxy2xywh':
@@ -36,14 +34,14 @@ class AAPoseMeta:
             self.load_from_meta(meta)
         elif kp2ds is not None:
             self.load_from_kp2ds(kp2ds)
-    
+
     def is_valid(self, kp, p, threshold):
         x, y = kp
-        if x < 0 or y < 0 or x > self.width or y > self.height or p < threshold: 
+        if x < 0 or y < 0 or x > self.width or y > self.height or p < threshold:
             return False
         else:
             return True
-    
+
     def get_bbox(self, kp, kp_p, threshold=0.5):
         kps = kp[kp_p > threshold]
         if kps.size == 0:
@@ -51,7 +49,7 @@ class AAPoseMeta:
         x0, y0 = kps.min(axis=0)
         x1, y1 = kps.max(axis=0)
         return x0, y0, x1, y1
-    
+
     def crop(self, x0, y0, x1, y1):
         all_kps = [self.kps_body, self.kps_lhand, self.kps_rhand, self.kps_face]
         for kps in all_kps:
@@ -61,7 +59,7 @@ class AAPoseMeta:
         self.width = x1 - x0
         self.height = y1 - y0
         return self
-    
+
     def resize(self, width, height):
         scale_x = width / self.width
         scale_y = height / self.height
@@ -74,14 +72,14 @@ class AAPoseMeta:
         self.height = height
         return self
 
-    
+
     def get_kps_body_with_p(self, normalize=False):
         kps_body = self.kps_body.copy()
         if normalize:
             kps_body = kps_body / np.array([self.width, self.height])
 
         return np.concatenate([kps_body, self.kps_body_p[:, None]])
-    
+
     @staticmethod
     def from_kps_face(kps_face: np.ndarray, height: int, width: int):
 
@@ -120,9 +118,9 @@ class AAPoseMeta:
             pose_meta.kps_face = meta["keypoints_face"][:, :2] * (width, height)
             pose_meta.kps_face_p = meta["keypoints_face"][:, 2]
         return pose_meta
-    
+
     def load_from_meta(self, meta, norm_body=True, norm_hand=False):
-        
+
         self.image_id = meta.get("image_id", "00000.png")
         self.height = meta["height"]
         self.width = meta["width"]
@@ -147,7 +145,7 @@ class AAPoseMeta:
         self.kps_rhand_p = np.array(meta["keypoints_right_hand"])[:, 2]
 
     @staticmethod
-    def load_from_kp2ds(kp2ds: List[np.ndarray], width: int, height: int): 
+    def load_from_kp2ds(kp2ds: List[np.ndarray], width: int, height: int):
         """input 133x3 numpy keypoints and output AAPoseMeta
 
         Args:
@@ -174,7 +172,7 @@ class AAPoseMeta:
         pose_meta.kps_face = kps_face[:, :2]
         pose_meta.kps_face_p = kps_face[:, 2]
         return pose_meta
-    
+
     @staticmethod
     def from_dwpose(dwpose_det_res, height, width):
         pose_meta = AAPoseMeta()
@@ -203,7 +201,7 @@ class AAPoseMeta:
         from .human_visualization import draw_aapose_by_meta
         return draw_aapose_by_meta(img, self, threshold, stick_width_norm, draw_hand, draw_head)
 
-    
+
     def translate(self, x0, y0):
         all_kps = [self.kps_body, self.kps_lhand, self.kps_rhand, self.kps_face]
         for kps in all_kps:
@@ -217,7 +215,7 @@ class AAPoseMeta:
             if kps is not None:
                 kps[:, 0] *= sx
                 kps[:, 1] *= sy
-    
+
     def padding_resize2(self, height=512, width=512):
         """kps will be changed inplace
 
@@ -232,7 +230,7 @@ class AAPoseMeta:
             padding = int((width - new_width) / 2)
             padding_width = padding
             padding_height = 0
-            scale = height / ori_height 
+            scale = height / ori_height
 
             for kps in all_kps:
                 if kps is not None:
@@ -243,7 +241,7 @@ class AAPoseMeta:
             new_height = int(width / ori_width * ori_height)
             padding = int((height - new_height) / 2)
             padding_width = 0
-            padding_height = padding 
+            padding_height = padding
             scale = width / ori_width
             for kps in all_kps:
                 if kps is not None:
@@ -254,7 +252,7 @@ class AAPoseMeta:
         self.width = width
         self.height = height
         return self
-        
+
 
 def transform_preds(coords, center, scale, output_size, use_udp=False):
     """Get final keypoint predictions from heatmaps and apply scaling and
@@ -1122,7 +1120,7 @@ def load_pose_metas_from_kp2ds_seq(kp2ds_seq, width, height):
         kps[:, 1] /= height
         kp2ds_body, kp2ds_lhand, kp2ds_rhand, kp2ds_face = split_kp2ds_for_aa(kps, ret_face=True)
 
-        # 排除全部小于0的情况
+        # Exclude cases where all values are less than 0
         if kp2ds_body[:, :2].min(axis=1).max() < 0:
             kp2ds_body = last_kp2ds_body
         last_kp2ds_body = kp2ds_body
