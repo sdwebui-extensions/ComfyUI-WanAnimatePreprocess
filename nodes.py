@@ -106,13 +106,16 @@ class PoseAndFaceDetection:
             refer_pose_meta = load_pose_metas_from_kp2ds_seq(ref_keypoints, width=retarget_image.shape[2], height=retarget_image.shape[1])[0]
 
         comfy_pbar = ProgressBar(B*2)
+        progress = 0
         bboxes = []
         for img in tqdm(images_np, total=len(images_np), desc="Detecting bboxes"):
             bboxes.append(detector(
                 cv2.resize(img, (640, 640)).transpose(2, 0, 1)[None],
                 shape
                 )[0][0]["bbox"])
-            comfy_pbar.update(1)
+            progress += 1
+            if progress % 10 == 0:
+                comfy_pbar.update_absolute(progress)
 
         detector.cleanup()
 
@@ -130,7 +133,9 @@ class PoseAndFaceDetection:
 
             keypoints = pose_model(img_norm[None], np.array(center)[None], np.array(scale)[None])
             kp2ds.append(keypoints)
-            comfy_pbar.update(1)
+            progress += 1
+            if progress % 10 == 0:
+                comfy_pbar.update_absolute(progress)
 
         pose_model.cleanup()
 
@@ -216,24 +221,31 @@ class DrawViTPose:
         retarget_image = pose_data.get("retarget_image", None)
         pose_metas = pose_data["pose_metas"]
 
-        draw_hand = True
-        if hand_stick_width == 0:
-            draw_hand = False
+        draw_hand = hand_stick_width != 0
+        use_retarget_resize = retarget_padding > 0 and retarget_image is not None
 
         comfy_pbar = ProgressBar(len(pose_metas))
+        progress = 0
         crop_target_image = None
         pose_images = []
+        
         for idx, meta in enumerate(tqdm(pose_metas, desc="Drawing pose images")):
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
+            
             if crop_target_image is None:
                 crop_target_image = pose_image
-            if retarget_padding == 0 or retarget_image is None:
-                pose_image = padding_resize(pose_image, height, width)
-            elif retarget_image is not None:
+
+            if use_retarget_resize:
                 pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
+            else:
+                pose_image = padding_resize(pose_image, height, width)
+                
             pose_images.append(pose_image)
-            comfy_pbar.update(1)
+            progress += 1
+            if progress % 10 == 0:
+                comfy_pbar.update_absolute(progress)
+            
         pose_images_np = np.stack(pose_images, 0)
         pose_images_tensor = torch.from_numpy(pose_images_np).float() / 255.0
 
