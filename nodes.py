@@ -60,19 +60,18 @@ class PoseAndFaceDetection:
                 "images": ("IMAGE",),
                 "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 1, "tooltip": "Width of the generation"}),
                 "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 1, "tooltip": "Height of the generation"}),
-                "retarget_padding": ("INT", {"default": 16, "min": 0, "max": 512, "step": 1, "tooltip": "When > 0, the retargeted pose image is padded and resized to the target size"}),
             },
             "optional": {
                 "retarget_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
             },
         }
 
-    RETURN_TYPES = ("BBOX", "IMAGE", "IMAGE", "STRING")
-    RETURN_NAMES = ("bboxes", "face_images", "pose_images", "key_frame_body_points")
+    RETURN_TYPES = ("POSEDATA", "IMAGE", "STRING", "BBOX", )
+    RETURN_NAMES = ("pose_data", "face_images", "key_frame_body_points", "bboxes", )
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
 
-    def process(self, model, images, width, height, retarget_image=None, retarget_padding=64):
+    def process(self, model, images, width, height, retarget_image=None):
         detector = model["yolo"]
         pose_model = model["vitpose"]
         B, H, W, C = images.shape
@@ -155,21 +154,6 @@ class PoseAndFaceDetection:
         else:
             retarget_pose_metas = [AAPoseMeta.from_humanapi_meta(meta) for meta in pose_metas]
 
-        crop_target_image = None
-        cond_images = []
-        for idx, meta in enumerate(retarget_pose_metas):
-            canvas = np.zeros_like(images_np[0])
-            pose_image = draw_aapose_by_meta_new(canvas, meta)
-            if crop_target_image is None:
-                crop_target_image = pose_image
-            if retarget_padding == 0:
-                pose_image = padding_resize(pose_image, height, width)
-            elif retarget_image is not None:
-                pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
-            cond_images.append(pose_image)
-        cond_images_np = np.stack(cond_images, 0)
-        cond_images_tensor = torch.from_numpy(cond_images_np)
-
         bbox = np.array(bboxes[0]).flatten()
         if bbox.shape[0] >= 4:
             bbox_ints = tuple(int(v) for v in bbox[:4])
@@ -181,7 +165,6 @@ class PoseAndFaceDetection:
         key_frame_index_list = list(range(0, len(pose_metas), key_frame_step))
 
         key_points_index = [0, 1, 2, 5, 8, 11, 10, 13]
-        key_frame_body_points_list = []
         
         for key_frame_index in key_frame_index_list:
             keypoints_body_list = []
@@ -200,13 +183,58 @@ class PoseAndFaceDetection:
                 points_dict_list.append({"x": int(point[0]), "y": int(point[1])})
 
 
-        return ([bbox_ints], face_images_tensor, cond_images_tensor, json.dumps(points_dict_list))
+        return (retarget_pose_metas, face_images_tensor, json.dumps(points_dict_list), [bbox_ints],)
+
+class DrawViTPose:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "pose_data": ("POSEDATA",),
+                "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 1, "tooltip": "Width of the generation"}),
+                "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 1, "tooltip": "Height of the generation"}),
+                "retarget_padding": ("INT", {"default": 16, "min": 0, "max": 512, "step": 1, "tooltip": "When > 0, the retargeted pose image is padded and resized to the target size"}),
+                "body_stick_width": ("INT", {"default": -1, "min": -1, "max": 20, "step": 1, "tooltip": "Width of the body sticks. Set to 0 to disable body drawing, -1 for auto"}),
+                "hand_stick_width": ("INT", {"default": -1, "min": -1, "max": 20, "step": 1, "tooltip": "Width of the hand sticks. Set to 0 to disable hand drawing, -1 for auto"}),
+                "draw_head": ("BOOLEAN", {"default": "True", "tooltip": "Whether to draw head keypoints"}),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", )
+    RETURN_NAMES = ("pose_images", )
+    FUNCTION = "process"
+    CATEGORY = "WanAnimatePreprocess"
+
+    def process(self, pose_data, width, height, body_stick_width, hand_stick_width, draw_head, retarget_image=None, retarget_padding=64):
+
+        draw_hand = True
+        if hand_stick_width == 0:
+            draw_hand = False
+            
+        crop_target_image = None
+        pose_images = []
+        for idx, meta in enumerate(pose_data):
+            canvas = np.zeros((height, width, 3), dtype=np.uint8)
+            pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
+            if crop_target_image is None:
+                crop_target_image = pose_image
+            if retarget_padding == 0:
+                pose_image = padding_resize(pose_image, height, width)
+            elif retarget_image is not None:
+                pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
+            pose_images.append(pose_image)
+        pose_images_np = np.stack(pose_images, 0)
+        pose_images_tensor = torch.from_numpy(pose_images_np)
+
+        return (pose_images_tensor, )
 
 NODE_CLASS_MAPPINGS = {
     "OnnxDetectionModelLoader": OnnxDetectionModelLoader,
     "PoseAndFaceDetection": PoseAndFaceDetection,
+    "DrawViTPose": DrawViTPose,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "OnnxDetectionModelLoader": "ONNX Detection Model Loader",
     "PoseAndFaceDetection": "Pose and Face Detection",
+    "DrawViTPose": "Draw ViT Pose",
 }

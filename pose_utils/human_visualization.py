@@ -90,7 +90,7 @@ def draw_handpose(canvas, keypoints, hand_score_th=0.6):
     return canvas
 
 
-def draw_handpose_new(canvas, keypoints, stickwidth_type='v2', hand_score_th=0.6):
+def draw_handpose_new(canvas, keypoints, stickwidth_type='v2', hand_score_th=0.6, hand_stick_width=4):
     """
     Draw keypoints and connections representing hand pose on a given canvas.
 
@@ -108,10 +108,14 @@ def draw_handpose_new(canvas, keypoints, stickwidth_type='v2', hand_score_th=0.6
     eps = 0.01
 
     H, W, C = canvas.shape
-    if stickwidth_type == 'v1':
-        stickwidth = max(int(min(H, W) / 200), 1)
-    elif stickwidth_type == 'v2':
+    # if stickwidth_type == 'v1':
+    #     stickwidth = max(int(min(H, W) / 200), 1)
+    # elif stickwidth_type == 'v2':
+    #     stickwidth = max(max(int(min(H, W) / 200) - 1, 1) // 2, 1)
+    if hand_stick_width == -1:
         stickwidth = max(max(int(min(H, W) / 200) - 1, 1) // 2, 1)
+    else:
+        stickwidth = hand_stick_width
 
     edges = [
         [0, 1],
@@ -215,12 +219,12 @@ def draw_aapose_by_meta(img, meta: AAPoseMeta, threshold=0.5, stick_width_norm=2
     pose_img = draw_aapose(img, kp2ds, threshold, kp2ds_lhand=kp2ds_lhand, kp2ds_rhand=kp2ds_rhand, stick_width_norm=stick_width_norm, draw_hand=draw_hand, draw_head=draw_head)
     return pose_img
 
-def draw_aapose_by_meta_new(img, meta: AAPoseMeta, threshold=0.5, stickwidth_type='v2', draw_hand=True, draw_head=True):
+def draw_aapose_by_meta_new(img, meta: AAPoseMeta, threshold=0.5, stickwidth_type='v2', body_stick_width=-1, draw_hand=True, draw_head=True, hand_stick_width=4):
     kp2ds = np.concatenate([meta.kps_body, meta.kps_body_p[:, None]], axis=1)
     kp2ds_lhand = np.concatenate([meta.kps_lhand, meta.kps_lhand_p[:, None]], axis=1)
     kp2ds_rhand = np.concatenate([meta.kps_rhand, meta.kps_rhand_p[:, None]], axis=1)
-    pose_img = draw_aapose_new(img, kp2ds, threshold, kp2ds_lhand=kp2ds_lhand, kp2ds_rhand=kp2ds_rhand,
-                               stickwidth_type=stickwidth_type, draw_hand=draw_hand, draw_head=draw_head)
+    pose_img = draw_aapose_new(img, kp2ds, threshold, kp2ds_lhand=kp2ds_lhand, kp2ds_rhand=kp2ds_rhand, body_stick_width=body_stick_width,
+                               stickwidth_type=stickwidth_type, draw_hand=draw_hand, draw_head=draw_head, hand_stick_width=hand_stick_width)
     return pose_img
 
 def draw_hand_by_meta(img, meta: AAPoseMeta, threshold=0.5, stick_width_norm=200):
@@ -757,6 +761,8 @@ def draw_aapose_new(
     kp2ds_rhand=None,
     draw_hand=False,
     stickwidth_type='v2',
+    body_stick_width=-1,
+    hand_stick_width=-1,
     draw_head=True
 ):
     """
@@ -855,12 +861,13 @@ def draw_aapose_new(
     H, W, C = img.shape
     H, W, C = img.shape
 
-    if stickwidth_type == 'v1':
-        stickwidth = max(int(min(H, W) / 200), 1)
-    elif stickwidth_type == 'v2':
+    #if stickwidth_type == 'v1':
+    #    stickwidth = max(int(min(H, W) / 200), 1)
+    #elif stickwidth_type == 'v2':
+    if body_stick_width == -1:
         stickwidth = max(int(min(H, W) / 200) - 1, 1)
     else:
-        raise
+        stickwidth = body_stick_width
 
     for _idx, ((k1_index, k2_index), color) in enumerate(zip(limbSeq, colors)):
         keypoint1 = kp2ds_body[k1_index - 1]
@@ -886,8 +893,8 @@ def draw_aapose_new(
         cv2.circle(img, (int(x), int(y)), stickwidth, color, thickness=-1)
 
     if draw_hand:
-        img = draw_handpose_new(img, kp2ds_lhand, stickwidth_type=stickwidth_type, hand_score_th=threshold)
-        img = draw_handpose_new(img, kp2ds_rhand, stickwidth_type=stickwidth_type, hand_score_th=threshold)
+        img = draw_handpose_new(img, kp2ds_lhand, stickwidth_type=stickwidth_type, hand_score_th=threshold, hand_stick_width=hand_stick_width)
+        img = draw_handpose_new(img, kp2ds_rhand, stickwidth_type=stickwidth_type, hand_score_th=threshold, hand_stick_width=hand_stick_width)
 
     kp2ds_body[:, 0] /= W
     kp2ds_body[:, 1] /= H
