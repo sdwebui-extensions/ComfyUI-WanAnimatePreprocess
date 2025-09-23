@@ -211,20 +211,23 @@ class DrawViTPose:
 
     def process(self, pose_data, width, height, body_stick_width, hand_stick_width, draw_head, retarget_padding=64):
 
-        crop_target_image = pose_data.get("retarget_image", None)
+        retarget_image = pose_data.get("retarget_image", None)
         pose_metas = pose_data["pose_metas"]
 
         draw_hand = True
         if hand_stick_width == 0:
             draw_hand = False
             
+        crop_target_image = None
         pose_images = []
         for idx, meta in enumerate(pose_metas):
             canvas = np.zeros((height, width, 3), dtype=np.uint8)
             pose_image = draw_aapose_by_meta_new(canvas, meta, draw_hand=draw_hand, draw_head=draw_head, body_stick_width=body_stick_width, hand_stick_width=hand_stick_width)
-            if retarget_padding == 0 or crop_target_image is None:
+            if crop_target_image is None:
+                crop_target_image = pose_image
+            if retarget_padding == 0 or retarget_image is None:
                 pose_image = padding_resize(pose_image, height, width)
-            elif crop_target_image is not None:
+            elif retarget_image is not None:
                 pose_image = resize_to_bounds(pose_image, height, width, crop_target_image=crop_target_image, extra_padding=retarget_padding)
             pose_images.append(pose_image)
         pose_images_np = np.stack(pose_images, 0)
