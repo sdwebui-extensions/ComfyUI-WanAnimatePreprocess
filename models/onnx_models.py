@@ -12,7 +12,7 @@ class SimpleOnnxInference(object):
         # Store initialization parameters for potential reinit
         self.checkpoint = checkpoint
         self.init_kwargs = kwargs
-        provider = [device]
+        provider = [device, 'CPUExecutionProvider'] if device == 'CUDAExecutionProvider' else [device]
 
         self.provider = provider
         self.session = onnxruntime.InferenceSession(checkpoint, providers=provider)
