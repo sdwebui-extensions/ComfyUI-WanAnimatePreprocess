@@ -5,6 +5,7 @@ import numpy as np
 import folder_paths
 import cv2
 import json
+import logging
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from comfy import model_management as mm
@@ -151,6 +152,20 @@ class PoseAndFaceDetection:
             x1, x2, y1, y2 = face_bbox_for_image
             face_bboxes.append((x1, y1, x2, y2))
             face_image = images_np[idx][y1:y2, x1:x2]
+            # Check if face_image is valid before resizing
+            if face_image.size == 0 or face_image.shape[0] == 0 or face_image.shape[1] == 0:
+                logging.warning(f"Empty face crop on frame {idx}, creating fallback image.")
+                # Create a fallback image (black or use center crop)
+                fallback_size = int(min(H, W) * 0.3)
+                fallback_x1 = (W - fallback_size) // 2
+                fallback_x2 = fallback_x1 + fallback_size
+                fallback_y1 = int(H * 0.1)
+                fallback_y2 = fallback_y1 + fallback_size
+                face_image = images_np[idx][fallback_y1:fallback_y2, fallback_x1:fallback_x2]
+                
+                # If still empty, create a black image
+                if face_image.size == 0:
+                    face_image = np.zeros((fallback_size, fallback_size, C), dtype=images_np.dtype)
             face_image = cv2.resize(face_image, (512, 512))
             face_images.append(face_image)
 
