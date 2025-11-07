@@ -83,8 +83,6 @@ class PoseAndFaceDetection:
 
         shape = np.array([H, W])[None]
         images_np = images.numpy()
-        if args.world_size>1 and B>=args.world_size:
-            images_np = tensor_chunk(images, dim=0)[args.rank].numpy()
 
         IMG_NORM_MEAN = np.array([0.485, 0.456, 0.406])
         IMG_NORM_STD = np.array([0.229, 0.224, 0.225])
@@ -147,24 +145,7 @@ class PoseAndFaceDetection:
         pose_model.cleanup()
 
         kp2ds = np.concatenate(kp2ds, 0)
-        if args.world_size>1 and B>=args.world_size:
-            np.save(f'tmp_{args.rank}.npy', kp2ds)
-            os.system(f'mv tmp_{args.rank}.npy {args.rank}.npy')
-            kp2ds = []
-            for rank_id in range(args.world_size):
-                while True:
-                    if not os.path.exists(f'{rank_id}.npy'):
-                        time.sleep(0.5)
-                    else:
-                        kp2ds.append(np.load(f'{rank_id}.npy'))  
-                        break
-            torch.distributed.barrier()
-            if args.rank==0:
-                for rank_id in range(args.world_size):
-                    os.system(f'rm -rf {rank_id}.npy')
-                    os.system(f'rm -rf {rank_id}.pth')
-            kp2ds = np.concatenate(kp2ds, 0)
-            torch.distributed.barrier()
+
         pose_metas = load_pose_metas_from_kp2ds_seq(kp2ds, width=W, height=H)
 
         face_images = []
@@ -193,58 +174,6 @@ class PoseAndFaceDetection:
 
         face_images_np = np.stack(face_images, 0)
         face_images_tensor = torch.from_numpy(face_images_np)
-        if args.world_size>1 and B>=args.world_size:
-            torch.save(face_images_tensor, f'tmp_{args.rank}.pth')
-            os.system(f'mv tmp_{args.rank}.pth {args.rank}.pth')
-            face_images_tensor = []
-            for rank_id in range(args.world_size):
-                while True:
-                    if not os.path.exists(f'{rank_id}.pth'):
-                        time.sleep(0.5)
-                    else:
-                        face_images_tensor.append(torch.load(f'{rank_id}.pth'))  
-                        break
-            face_images_tensor = torch.cat(face_images_tensor, dim=0)
-            torch.distributed.barrier()
-            if args.rank==0:
-                for rank_id in range(args.world_size):
-                    os.system(f'rm -rf {rank_id}.npy')
-                    os.system(f'rm -rf {rank_id}.pth')
-            torch.distributed.barrier()
-            np.save(f'tmp_{args.rank}.npy', bboxes)
-            os.system(f'mv tmp_{args.rank}.npy {args.rank}.npy')
-            bboxes = []
-            for rank_id in range(args.world_size):
-                while True:
-                    if not os.path.exists(f'{rank_id}.npy'):
-                        time.sleep(0.5)
-                    else:
-                        bboxes.extend(np.load(f'{rank_id}.npy'))  
-                        break
-            
-            torch.distributed.barrier()
-            if args.rank==0:
-                for rank_id in range(args.world_size):
-                    os.system(f'rm -rf {rank_id}.npy')
-                    os.system(f'rm -rf {rank_id}.pth')
-            torch.distributed.barrier()
-            
-            np.save(f'tmp_{args.rank}.npy', face_bboxes)
-            os.system(f'mv tmp_{args.rank}.npy {args.rank}.npy')
-            face_bboxes = []
-            for rank_id in range(args.world_size):
-                while True:
-                    if not os.path.exists(f'{rank_id}.npy'):
-                        time.sleep(0.5)
-                    else:
-                        face_bboxes.extend(np.load(f'{rank_id}.npy'))  
-                        break
-            torch.distributed.barrier()
-            if args.rank==0:
-                for rank_id in range(args.world_size):
-                    os.system(f'rm -rf {rank_id}.npy')
-                    os.system(f'rm -rf {rank_id}.pth')
-            torch.distributed.barrier()
 
         if retarget_image is not None and refer_pose_meta is not None:
             retarget_pose_metas = get_retarget_pose(pose_metas[0], refer_pose_meta, pose_metas, None, None)
@@ -285,6 +214,8 @@ class PoseAndFaceDetection:
             "refer_pose_meta": refer_pose_meta if retarget_image is not None else None,
             "pose_metas_original": pose_metas,
         }
+        if args.world_size>1:
+            torch.distributed.barrier()
 
         return (pose_data, face_images_tensor, json.dumps(points_dict_list), [bbox_ints], face_bboxes)
 
