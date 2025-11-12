@@ -308,10 +308,18 @@ def get_face_bboxes(kp2ds, scale, image_shape):
 
     delta_width = (new_width - initial_width) / 2
     delta_height = (new_height - initial_height) / 4
+    min_x = min_x - delta_width
+    max_x = max_x + delta_width
+    min_y = min_y - 3 * delta_height
+    max_y = max_y + delta_height
+    min_x = np.nan_to_num(min_x, nan=0)
+    min_y = np.nan_to_num(min_y, nan=0)
+    max_x = np.nan_to_num(max_x, nan=10000000)
+    max_y = np.nan_to_num(max_y, nan=10000000)
 
-    expanded_min_x = max(min_x - delta_width, 0)
-    expanded_max_x = min(max_x + delta_width, w)
-    expanded_min_y = max(min_y - 3 * delta_height, 0)
-    expanded_max_y = min(max_y + delta_height, h)
+    expanded_min_x = max(min_x, 0)
+    expanded_max_x = min(max_x, w)
+    expanded_min_y = max(min_y, 0)
+    expanded_max_y = min(max_y, h)
 
     return [int(expanded_min_x), int(expanded_max_x), int(expanded_min_y), int(expanded_max_y)]
