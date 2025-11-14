@@ -214,8 +214,8 @@ class PoseAndFaceDetection:
             "refer_pose_meta": refer_pose_meta if retarget_image is not None else None,
             "pose_metas_original": pose_metas,
         }
-        if args.world_size>1:
-            torch.distributed.barrier()
+        # if args.world_size>1:
+        #     torch.distributed.barrier()
 
         return (pose_data, face_images_tensor, json.dumps(points_dict_list), [bbox_ints], face_bboxes)
 
