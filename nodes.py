@@ -444,7 +444,7 @@ class PoseDetectionOneToAllAnimation:
                 tpl_dwposes = align_to_reference(refer_pose_meta, pose_metas, tpl_dwposes, anchor_idx=0)
                 image_input_tensor = ref_image
             elif align_to == "pose":
-                image_input, ref_pose_image_np, mask_input = warp_ref_to_pose(refer_img_np, tpl_dwposes[0], ref_dwpose)
+                image_input, ref_pose_image_np, _ = warp_ref_to_pose(refer_img_np, tpl_dwposes[0], ref_dwpose)
                 ref_pose_image_np = np.stack(ref_pose_image_np, 0)
                 ref_pose_image_tensor = torch.from_numpy(ref_pose_image_np).unsqueeze(0).float() / 255.0
                 tpl_dwposes = align_to_pose(ref_dwpose, tpl_dwposes, anchor_idx=0)
@@ -458,7 +458,7 @@ class PoseDetectionOneToAllAnimation:
             pose_img = torch.from_numpy(np.array(pose_img))
             pose_imgs.append(pose_img)
 
-        pose_tensor = torch.stack(pose_imgs).cpu().float() / 255.0      # (T,C,H,W)
+        pose_tensor = torch.stack(pose_imgs).cpu().float() / 255.0
 
         return (pose_tensor, ref_pose_image_tensor, image_input_tensor)
 
