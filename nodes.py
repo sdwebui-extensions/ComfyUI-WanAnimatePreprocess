@@ -9,7 +9,7 @@ import logging
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from comfy import model_management as mm
-from comfy.utils import load_torch_file, ProgressBar
+from comfy.utils import ProgressBar
 device = mm.get_torch_device()
 offload_device = mm.unet_offload_device()
 
@@ -18,7 +18,7 @@ folder_paths.add_model_folder_path("detection", os.path.join(folder_paths.models
 from .models.onnx_models import ViTPose, Yolo
 from .pose_utils.pose2d_utils import load_pose_metas_from_kp2ds_seq, crop, bbox_from_detector
 from .utils import get_face_bboxes, padding_resize, resize_by_area, resize_to_bounds
-from .pose_utils.human_visualization import AAPoseMeta, draw_aapose_by_meta_new, draw_aaface_by_meta
+from .pose_utils.human_visualization import AAPoseMeta, draw_aapose_by_meta_new
 from .retarget_pose import get_retarget_pose
 
 class OnnxDetectionModelLoader:
@@ -162,7 +162,7 @@ class PoseAndFaceDetection:
                 fallback_y1 = int(H * 0.1)
                 fallback_y2 = fallback_y1 + fallback_size
                 face_image = images_np[idx][fallback_y1:fallback_y2, fallback_x1:fallback_x2]
-                
+
                 # If still empty, create a black image
                 if face_image.size == 0:
                     face_image = np.zeros((fallback_size, fallback_size, C), dtype=images_np.dtype)
