@@ -340,8 +340,8 @@ class PoseDetectionOneToAllAnimation:
             "required": {
                 "model": ("POSEMODEL",),
                 "images": ("IMAGE",),
-                "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 1, "tooltip": "Width of the generation"}),
-                "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 1, "tooltip": "Height of the generation"}),
+                "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 2, "tooltip": "Width of the generation"}),
+                "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 2, "tooltip": "Height of the generation"}),
                 "align_to": (["ref", "pose"], {"default": "ref", "tooltip": "Alignment mode for poses"}),
                 "draw_face_points": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw face keypoints on the pose images"}),
                 "draw_head": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw head keypoints on the pose images"}),
@@ -351,8 +351,8 @@ class PoseDetectionOneToAllAnimation:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE")
-    RETURN_NAMES = ("pose_images", "ref_pose_image", "ref_image")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "MASK",)
+    RETURN_NAMES = ("pose_images", "ref_pose_image", "ref_image", "image_mask")
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
     DESCRIPTION = "Specialized pose detection and alignment for OneToAllAnimation model https://github.com/ssj9596/One-to-All-Animation. Detects poses from input images and aligns them based on a reference image if provided."
@@ -443,12 +443,14 @@ class PoseDetectionOneToAllAnimation:
                 ref_pose_image_tensor = torch.from_numpy(ref_pose_image_np).unsqueeze(0).float() / 255.0
                 tpl_dwposes = align_to_reference(refer_pose_meta, pose_metas, tpl_dwposes, anchor_idx=0)
                 image_input_tensor = ref_image
+                image_mask_tensor = torch.zeros(1, ref_image.shape[1], ref_image.shape[2], dtype=torch.float32, device="cpu")
             elif align_to == "pose":
-                image_input, ref_pose_image_np, _ = warp_ref_to_pose(refer_img_np, tpl_dwposes[0], ref_dwpose)
+                image_input, ref_pose_image_np, image_mask = warp_ref_to_pose(refer_img_np, tpl_dwposes[0], ref_dwpose)
                 ref_pose_image_np = np.stack(ref_pose_image_np, 0)
                 ref_pose_image_tensor = torch.from_numpy(ref_pose_image_np).unsqueeze(0).float() / 255.0
                 tpl_dwposes = align_to_pose(ref_dwpose, tpl_dwposes, anchor_idx=0)
                 image_input_tensor = torch.from_numpy(image_input).unsqueeze(0).float() / 255.0
+                image_mask_tensor = torch.from_numpy(image_mask).unsqueeze(0).float() / 255.0
         else:
             ref_pose_image_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
 
@@ -460,7 +462,7 @@ class PoseDetectionOneToAllAnimation:
 
         pose_tensor = torch.stack(pose_imgs).cpu().float() / 255.0
 
-        return (pose_tensor, ref_pose_image_tensor, image_input_tensor)
+        return (pose_tensor, ref_pose_image_tensor, image_input_tensor, image_mask_tensor)
 
 NODE_CLASS_MAPPINGS = {
     "OnnxDetectionModelLoader": OnnxDetectionModelLoader,

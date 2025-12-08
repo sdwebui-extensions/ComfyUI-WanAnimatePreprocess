@@ -142,7 +142,7 @@ def hsv_to_rgb(hsv):
     gray_mask = s == 0
     rgb[gray_mask] = np.stack([v[gray_mask]] * 3, axis=1)
 
-    return (rgb.reshape(in_shape) * 255).astype(np.uint8)
+    return (rgb.reshape(in_shape) * 255)
 
 def get_stickwidth(W, H, stickwidth=4):
     if max(W, H) < 512:
