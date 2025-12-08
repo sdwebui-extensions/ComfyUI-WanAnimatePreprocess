@@ -352,7 +352,7 @@ class PoseDetectionOneToAllAnimation:
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "MASK",)
-    RETURN_NAMES = ("pose_images", "ref_pose_image", "ref_image", "image_mask")
+    RETURN_NAMES = ("pose_images", "ref_pose_image", "ref_image", "ref_mask")
     FUNCTION = "process"
     CATEGORY = "WanAnimatePreprocess"
     DESCRIPTION = "Specialized pose detection and alignment for OneToAllAnimation model https://github.com/ssj9596/One-to-All-Animation. Detects poses from input images and aligns them based on a reference image if provided."
