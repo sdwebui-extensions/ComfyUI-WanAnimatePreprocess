@@ -342,7 +342,7 @@ class PoseDetectionOneToAllAnimation:
                 "images": ("IMAGE",),
                 "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 2, "tooltip": "Width of the generation"}),
                 "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 2, "tooltip": "Height of the generation"}),
-                "align_to": (["ref", "pose"], {"default": "ref", "tooltip": "Alignment mode for poses"}),
+                "align_to": (["ref", "pose", "none"], {"default": "ref", "tooltip": "Alignment mode for poses"}),
                 "draw_face_points": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw face keypoints on the pose images"}),
                 "draw_head": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw head keypoints on the pose images"}),
             },
@@ -451,6 +451,12 @@ class PoseDetectionOneToAllAnimation:
                 tpl_dwposes = align_to_pose(ref_dwpose, tpl_dwposes, anchor_idx=0)
                 image_input_tensor = torch.from_numpy(image_input).unsqueeze(0).float() / 255.0
                 image_mask_tensor = torch.from_numpy(image_mask).unsqueeze(0).float() / 255.0
+            elif align_to == "none":
+                ref_pose_image =  draw_pose_aligned(ref_dwpose, height, width, without_face=True)
+                ref_pose_image_np = np.stack(ref_pose_image, 0)
+                ref_pose_image_tensor = torch.from_numpy(ref_pose_image_np).unsqueeze(0).float() / 255.0
+                image_input_tensor = ref_image
+                image_mask_tensor = torch.zeros(1, ref_image.shape[1], ref_image.shape[2], dtype=torch.float32, device="cpu")
         else:
             ref_pose_image_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
 
