@@ -375,8 +375,8 @@ class PoseDetectionOneToAllAnimation:
         detector.reinit()
         pose_model.reinit()
 
-        refer_img_np = ref_image[0].numpy() * 255
         if ref_image is not None:
+            refer_img_np = ref_image[0].numpy() * 255
             refer_img = resize_by_area(refer_img_np, width * height, divisor=16) / 255.0
             ref_bbox = (detector(
                 cv2.resize(refer_img.astype(np.float32), (640, 640)).transpose(2, 0, 1)[None],
@@ -459,6 +459,8 @@ class PoseDetectionOneToAllAnimation:
                 image_mask_tensor = torch.zeros(1, ref_image.shape[1], ref_image.shape[2], dtype=torch.float32, device="cpu")
         else:
             ref_pose_image_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
+            image_input_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
+            image_mask_tensor = torch.zeros(1, height, width, dtype=torch.float32, device="cpu")
 
         pose_imgs = []
         for pose_np in tpl_dwposes:
