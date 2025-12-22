@@ -65,6 +65,7 @@ class PoseAndFaceDetection:
             },
             "optional": {
                 "retarget_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
+                "face_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "tooltip": "When > 0, the detected face images are padded and resized to 512x512"}),
             },
         }
 
@@ -74,7 +75,7 @@ class PoseAndFaceDetection:
     CATEGORY = "WanAnimatePreprocess"
     DESCRIPTION = "Detects human poses and face images from input images. Optionally retargets poses based on a reference image."
 
-    def process(self, model, images, width, height, retarget_image=None):
+    def process(self, model, images, width, height, retarget_image=None, face_padding=0):
         detector = model["yolo"]
         pose_model = model["vitpose"]
         B, H, W, C = images.shape
@@ -150,6 +151,11 @@ class PoseAndFaceDetection:
         for idx, meta in enumerate(pose_metas):
             face_bbox_for_image = get_face_bboxes(meta['keypoints_face'][:, :2], scale=1.3, image_shape=(H, W))
             x1, x2, y1, y2 = face_bbox_for_image
+            if face_padding > 0:
+                x1 = max(0, x1 - face_padding)
+                y1 = max(0, y1 - face_padding)
+                x2 = min(W, x2 + face_padding)
+                y2 = min(H, y2 + face_padding)
             face_bboxes.append((x1, y1, x2, y2))
             face_image = images_np[idx][y1:y2, x1:x2]
             # Check if face_image is valid before resizing
