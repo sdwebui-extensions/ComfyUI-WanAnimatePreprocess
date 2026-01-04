@@ -67,6 +67,7 @@ class PoseAndFaceDetection:
             },
             "optional": {
                 "retarget_image": ("IMAGE", {"default": None, "tooltip": "Optional reference image for pose retargeting"}),
+                "face_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "tooltip": "When > 0, the detected face images are padded and resized to 512x512"}),
             },
         }
 
@@ -76,7 +77,7 @@ class PoseAndFaceDetection:
     CATEGORY = "WanAnimatePreprocess"
     DESCRIPTION = "Detects human poses and face images from input images. Optionally retargets poses based on a reference image."
 
-    def process(self, model, images, width, height, retarget_image=None):
+    def process(self, model, images, width, height, retarget_image=None, face_padding=0):
         detector = model["yolo"]
         pose_model = model["vitpose"]
         B, H, W, C = images.shape
@@ -153,6 +154,11 @@ class PoseAndFaceDetection:
         for idx, meta in enumerate(pose_metas[:images_np.shape[0]]):
             face_bbox_for_image = get_face_bboxes(meta['keypoints_face'][:, :2], scale=1.3, image_shape=(H, W))
             x1, x2, y1, y2 = face_bbox_for_image
+            if face_padding > 0:
+                x1 = max(0, x1 - face_padding)
+                y1 = max(0, y1 - face_padding)
+                x2 = min(W, x2 + face_padding)
+                y2 = min(H, y2 + face_padding)
             face_bboxes.append((x1, y1, x2, y2))
             face_image = images_np[idx][y1:y2, x1:x2]
             # Check if face_image is valid before resizing
@@ -347,7 +353,7 @@ class PoseDetectionOneToAllAnimation:
                 "images": ("IMAGE",),
                 "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 2, "tooltip": "Width of the generation"}),
                 "height": ("INT", {"default": 480, "min": 64, "max": 2048, "step": 2, "tooltip": "Height of the generation"}),
-                "align_to": (["ref", "pose"], {"default": "ref", "tooltip": "Alignment mode for poses"}),
+                "align_to": (["ref", "pose", "none"], {"default": "ref", "tooltip": "Alignment mode for poses"}),
                 "draw_face_points": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw face keypoints on the pose images"}),
                 "draw_head": (["full", "weak", "none"], {"default": "full", "tooltip": "Whether to draw head keypoints on the pose images"}),
             },
@@ -380,8 +386,8 @@ class PoseDetectionOneToAllAnimation:
         detector.reinit()
         pose_model.reinit()
 
-        refer_img_np = ref_image[0].numpy() * 255
         if ref_image is not None:
+            refer_img_np = ref_image[0].numpy() * 255
             refer_img = resize_by_area(refer_img_np, width * height, divisor=16) / 255.0
             ref_bbox = (detector(
                 cv2.resize(refer_img.astype(np.float32), (640, 640)).transpose(2, 0, 1)[None],
@@ -456,8 +462,16 @@ class PoseDetectionOneToAllAnimation:
                 tpl_dwposes = align_to_pose(ref_dwpose, tpl_dwposes, anchor_idx=0)
                 image_input_tensor = torch.from_numpy(image_input).unsqueeze(0).float() / 255.0
                 image_mask_tensor = torch.from_numpy(image_mask).unsqueeze(0).float() / 255.0
+            elif align_to == "none":
+                ref_pose_image =  draw_pose_aligned(ref_dwpose, height, width, without_face=True)
+                ref_pose_image_np = np.stack(ref_pose_image, 0)
+                ref_pose_image_tensor = torch.from_numpy(ref_pose_image_np).unsqueeze(0).float() / 255.0
+                image_input_tensor = ref_image
+                image_mask_tensor = torch.zeros(1, ref_image.shape[1], ref_image.shape[2], dtype=torch.float32, device="cpu")
         else:
             ref_pose_image_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
+            image_input_tensor = torch.zeros((1, height, width, 3), dtype=torch.float32, device="cpu")
+            image_mask_tensor = torch.zeros(1, height, width, dtype=torch.float32, device="cpu")
 
         pose_imgs = []
         for pose_np in tpl_dwposes:
